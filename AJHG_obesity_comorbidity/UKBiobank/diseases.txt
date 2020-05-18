@@ -1,0 +1,32 @@
+disease	label	order
+obesity	Obesity	1
+diabetes	Diabetes	6
+hypertension	Hypertension	13
+stroke	Stroke	12
+copd	COPD	17
+asthma	Asthma	16
+fev1	Forced expir. vol. 1 sec (FEV1)	18
+fvc	Forced vital capacity (FVC)	19
+fev1_fvc	Ratio of FEV1 to FVC	20
+sbp	Systolic blood pressure	14
+dbp	Diastolic blood pressure	15
+waist	Waist circumference	3
+hip	Hip	4
+whr	Waist-hip ratio	5
+bmi	Body mass index (BMI)	2
+chol	Total cholesterol	11
+gluc	Fasting Glucose	7
+hdl	High-density lipoproteins	8
+ldl	Low-density lipoproteins	9
+trig	Triglycerides	10
+risk	Risk behaviour	24	
+bip	Bipolar disorder	22
+everDep	Depression	21
+moodSwin	Mood Swing	25
+neurot	Neuroticism	23
+asthma.ob	Asthma/Obesity	28
+diab.ob	Diabetes/Obesity	26
+hyp.ob	Hypertension/Obesity	27
+ob.dep	Depression/Obesity	29
+ob.neuro	Neuroticism/Obesity	31
+ob.bipo	Bipolar disorder/Obesity	30

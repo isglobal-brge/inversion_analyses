@@ -1,0 +1,665 @@
+---
+title: "Polymorphic inversions underlie the shared genetic susceptibility to prevalent common diseases"
+author: "Juan R Gonzalez, Carlos Ruiz-Arenas, Alejandro Caceres, Ignasi Moran, Marcos Lopez, Lorena Alonso, Ignacio Tolosana, Marta Guindo-Martinez, Josep M Mercader, Tonu Esko, David Torrents, Josefa Gonzalez, Luis A Perez-Jurado"
+output:
+  BiocStyle::html_document:
+    toc_depth: 3
+  BiocStyle::pdf_document:
+    toc_depth: 3
+---
+
+```{r style, echo=FALSE}
+library("knitr")
+opts_chunk$set(message = FALSE, error = TRUE, 
+               warning = FALSE, cache=TRUE, comment="")
+```
+
+# Getting started 
+
+Let us load the required libraries to reproduce paper's results:
+
+```{r load_libraries}
+library(tidyverse)
+library(FactoMineR)
+library(factoextra)
+library(nlme)
+library(org.Hs.eg.db)
+library(clusterProfiler)
+library(scoreInvHap)
+library(SNPassoc)
+library(snpStats)
+library(meta)
+library(RColorBrewer)
+library(OmicCircos)
+library(compareGroups)
+```
+
+Then, some functions are created to facilitate data analysis and visualizations. The functions are loaded by:
+
+```{r load_functions, cache=FALSE}
+source("R/aux_functions.R")
+```
+
+The inversion calling is perfomed using `scoreInvHap` Bioconductor package using the imputed data obtained after applying our pipeline described here: https://github.com/isglobal-brge/imputeInversion. The inversion regions of each SNP array or GWAS dataset are first imputed to get all the required SNPs that are used to call inversion genotypes. 
+
+# Geographical inversion distribution in European regions
+
+We first are interested in finding population structure at European level. To this end, the Population Reference Sample study (POPRES) obtained from dbGAP (accesion number phs000145.v4.p2) is used. We select those samples passing QC and having European origin:
+
+```{r load_POPRES}
+popres <- read.delim("POPRES/ScoreInvHap_POPRES_final_full.txt",
+                     as.is =TRUE, na=c("", NA, " "))
+popres <- popres[popres$'STATUS_OVERALL'=="Passed QC",]
+```
+
+
+```{r remove_and_add_new}
+popres.old <- popres
+ll <- grep("inv", colnames(popres.old))
+popres <- popres.old[,-ll]
+
+load("POPRES/scoreInvHapClassDFPOPRES.Rdata")
+popres <- merge(popres, scClassDF, by.x="SUBJID",
+           by.y="row.names")
+
+popres.eur <- subset(popres,
+                     GROUPING_CONTINENTAL_ORIGIN ==
+                       "European")
+```
+
+
+This is the number of samples per region
+
+```{r print_regions}
+table(popres.eur$"GROUPING_PCA_LABEL2")
+table(popres.eur$"EUROPEAN_LABEL")
+
+```
+
+Let's estimate the inversion frequencies per european region
+
+```{r freq_EURreg}
+ii <- grep("inv", names(popres.eur))
+freq.EURreg <- getFreqs(popres.eur, 
+                        index.inv=ii,
+                        grouping = "GROUPING_PCA_LABEL2", 
+                        sep="")
+freq.EURreg
+```
+
+```{r plot_EURreg}
+xx <- data.frame(freq.EURreg[,-1])
+rownames(xx) <- freq.EURreg$pop
+pca.EURreg <- prcomp(xx,
+                    center = TRUE, scale = TRUE)
+p.1000G.pca <- fviz_pca_biplot(pca.EURreg, 
+                               repel = TRUE,
+                col.var = "#2E9FDF", # Variables color
+                col.ind = "#696969"  # Individuals color
+                )
+p.1000G.pca
+```
+
+
+```{r plot_EURreg2}
+xx2 <- xx[-c(1:3), ]
+pca.EURreg2 <- prcomp(xx2, center = TRUE, 
+                      scale = TRUE)
+
+fviz_pca_biplot(pca.EURreg2, repel = TRUE,
+                col.var = "#2E9FDF", # Variables color
+                col.ind = "#696969"  # Individuals color
+                )
+```
+
+
+Let us estimate the frequencies North-Center-South
+
+```{r freq_EURreg2}
+
+popres.eur3 <- popres.eur[popres.eur$GROUPING_PCA_LABEL2%in%
+                            c("EuropeN", "EuropeNE", "EuropeNW",
+                              "Mix",
+                              "EuropeS"),]
+popres.eur3$pop <- as.factor(popres.eur3$GROUPING_PCA_LABEL2)
+levels(popres.eur3$pop) <- c("North", "North",  "North", "South", "Center")
+
+n.europe <- table(popres.eur3$pop)
+
+
+ii <- grep("inv", names(popres.eur3))
+freq.EURreg2 <- getFreqs(popres.eur3, 
+                        index.inv=ii,
+                        grouping = "pop", 
+                        sep="")
+freq.EURreg2$pop <- relevel(freq.EURreg2$pop,2)
+freq.EURreg2 <- data.frame(freq.EURreg2)
+rownames(freq.EURreg2) <- freq.EURreg2$pop
+freq.EURreg2
+```
+
+## European countries
+
+We select those countries having more than 20 samples to get robust inversion frequencies estimation and remove those countries that are not in Europe.
+
+```{r freq_EURcountry}
+tt <- table(popres.eur$COUNTRY_SELF)
+sel <- intersect(names(tt)[tt>20],  
+                 names(tt)[!names(tt)%in%
+                             c("Australia", "Canada",
+                               "USA", "CEU")])
+popres.eur2 <- subset(popres.eur, popres.eur$COUNTRY_SELF%in%sel &
+                        !is.na(popres.eur$COUNTRY_SELF))
+``` 
+
+
+```{r freq_EURcount}
+ii <- grep("inv", colnames(popres.eur2))
+freq.EURcountry <- getFreqs(popres.eur2,
+                            index.inv = ii,
+                            grouping = "COUNTRY_SELF",
+                            sep="")
+freq.EURcountry
+```
+
+
+```{r plot_EURcountry}
+xx <- data.frame(freq.EURcountry[,-1])
+rownames(xx) <- freq.EURcountry$pop
+pca.EURcountry <- prcomp(xx,
+                    center = TRUE, scale = TRUE)
+fviz_pca_biplot(pca.EURcountry, repel = TRUE,
+                col.var = "#2E9FDF", # Variables color
+                col.ind = "#696969"  # Individuals color
+                )
+```
+
+```{r plotGeographical1}
+x <- tidyr::gather(freq.EURreg, 
+                   key="inversion", 
+                   value="freq", -pop)
+colourCount <- length(unique(x$pop)) 
+x2 <- x
+p2 <- ggplot(x2, aes(x=pop, y=freq, fill=pop)) +
+  geom_bar(stat="identity") + facet_wrap(~ inversion) +
+  labs(fill = "Region", x="", y="Frequency of I allele") +
+  ggtitle("European regions (POPRES)") +
+  scale_fill_manual(values = colorRampPalette
+                    (brewer.pal(11, "PRGn"))(colourCount))+
+  theme(axis.text.x=element_blank(), 
+        axis.title.y = element_text(size=16),
+        axis.text.y = element_text(size=12),
+        title = element_text(face="bold", size=14))  
+
+p2
+```
+
+```{r plotGeographical2}
+x <- tidyr::gather(freq.EURreg2, 
+                   key="inversion", 
+                   value="freq", -pop)
+x$pop2 <- factor(x$pop, levels=c("North", "Center", "South"))
+
+p3 <- ggplot(x, aes(x=pop2, y=freq, fill=pop2)) +
+  geom_bar(stat="identity") + facet_wrap(~ inversion) +
+  labs(fill = "Region", x="", y="Frequency of I allele") +
+  ggtitle("POPRES") +
+  scale_fill_manual(values = colorRampPalette
+                    (brewer.pal(11, "PRGn"))(colourCount))+
+  theme(axis.text.x=element_blank(), 
+        axis.title.y = element_text(size=16),
+        axis.text.y = element_text(size=12),
+        title = element_text(face="bold", size=14))  
+
+p3
+```
+
+```{r test_trend}
+
+ll <- c("North", "Center", "South")
+mat <- matrix(NA, nrow=length(invs.pops), ncol=4)
+j <- 1
+for (i in invs.pops) {
+  freqs.i <- freq.EURreg2[ll,i]
+  p.i <- prop.trend.test(round((freqs.i/100)*n.europe,0), n.europe, score=c(1,2,3))$p.value
+  mat[j,] <- c(freqs.i, p.i)
+  j <- j + 1
+}
+rownames(mat) <- invs.pops
+colnames(mat) <- c("North", "Center", "South", "pvalue")
+cbind(round(mat[,1:3],1), pval=round(mat[,4],4))
+
+ii <- grep("^inv", names(popres.eur))
+x.s <- setupSNP(popres.eur, ii, sep="")
+summary(x.s)
+alleles <- getAlleleRefs(x.s)
+alleles$ref
+```
+
+
+
+### European countries
+
+```{r plotEuropeanFreqs}
+x <- tidyr::gather(freq.EURcountry, 
+                   key="inversion", 
+                   value="freq", -pop)
+colourCount <- length(unique(x$pop)) 
+
+p1 <- ggplot(x[!x$pop%in%c("EuropeanA", "EuropeanB"),], 
+             aes(x=pop, y=freq, fill=pop)) +
+      geom_bar(stat="identity") + facet_wrap(~ inversion) +
+      labs(fill = "Country", x="", 
+           y="Frequency of I allele") +
+      ggtitle("POPRES - European Countries") +
+  scale_fill_manual(values = colorRampPalette
+                    (brewer.pal(11, "PRGn"))(colourCount))+
+  theme(axis.text.x=element_blank(), 
+        axis.title.y = element_text(size=16),
+        axis.text.y = element_text(size=12),
+        title = element_text(face="bold", size=14))  
+
+p1
+```
+
+
+
+
+# Inversion association studies
+
+## Discovery analysis: UK Biobank
+
+Load data:
+
+```{r load_ukb}
+load("UKBiobank/caco_ukb.Rdata")
+ii <- grep("inv", names(bd.s))
+bd.s <- setupSNP(bd.s, ii)
+```
+
+```{r setupSNP}
+sum.ukb <- summary(bd.s)
+```
+
+```{r descr_ukb, eval=FALSE}
+vars <- c("obesity", "bmi", "bmicat", "waist", "hip", "whr", "diabetes", "gluc", "hdl", "ldl", "trig", "chol", "stroke", "hypertension",
+          "sbp", "dbp", "asthma", "copd", "fev1", "fvc", "fev1_fvc", "everDep", "bip", "neurot", "risk", "moodSwin",  "diab.ob", "hyp.ob",
+          "asthma.ob", "ob.dep", "ob.neuro")
+bb <- bd.s[,vars]
+idx <- which(sapply(bb, is.logical))
+bb <- bb%>%mutate_at(idx, as.integer)
+idx <- which(sapply(bb,function(x) length(table(x))==2))
+bb <- bb%>%mutate_at(idx, factor, labels=c("no", "yes"))
+
+descr <- compareGroups( ~. , bb)
+tab.descr <- createTable(descr)
+export2md(tab.descr)
+```
+
+Let us export the data to a Word table
+
+```{r export_tren_table}
+export2word(tab.descr, file="tab_sup1.docx")
+```
+
+
+The association analysis is performed by (add R code):
+
+....
+
+
+The object having the results is loaded by:
+
+```{r get_results, echo=FALSE}
+load(file="UKBiobank/resUKB.Rdata")
+ans.ukb <- ans.ukb[-which(names(ans.ukb)=="triad")]
+diseases.ukb <- names(ans.ukb)
+invs <- rownames(ans.ukb$obesity)
+```
+
+
+```{r getPvaluesUKB}
+getP <- function(x){
+  apply(pvalues(x), 1, min, na.rm=TRUE)
+}
+
+temp <- lapply(ans.ukb, getP)
+pUKB <- data.frame(p.value=unlist(temp))
+
+
+pUKB$disease <- rep(diseases.ukb, each=length(invs))
+pUKB$inversion <- rep(invs,
+                      length(diseases.ukb))
+
+refs <- unlist(getAlleleRef(sum.ukb$alleles))
+refs.ukb <- data.frame(inversion=rownames(sum.ukb),
+                       ref = refs, 
+                       stringsAsFactors = FALSE) 
+
+pUKB <- left_join(pUKB, refs.ukb)
+
+oo <- data.frame(lapply(ans.ukb, getBetasSign))
+betas <- rownames_to_column(oo, 'inversion') %>% 
+  gather(disease, beta, -inversion)
+betas$beta <- factor(betas$beta, labels = c("Negative", "Positive"))
+pUKB <- left_join(pUKB, betas)
+pUKB$sign <- pUKB$beta
+pUKB$sign[pUKB$ref=="I" & pUKB$beta=="Positive"] <- "Negative"
+pUKB$sign[pUKB$ref=="I" & pUKB$beta=="Negative"] <- "Positive"
+
+orderInvs <- c("inv8_001", "inv16_009", "inv17_007",
+               "inv2_002", "inv3_003", "inv7_003", "inv11_001",
+               "inv12_006", "inv1_004", "inv1_008", "inv2_013", "inv6_002",
+               "inv6_006", "inv7_005", "inv7_011", "inv7_014", "inv11_004", 
+               "inv12_004", "inv14_005", "inv21_005", "invX_006")
+
+orderDis <- read.delim("UKBiobank/diseases.txt", as.is=TRUE)
+
+
+pUKBend <- inner_join(pUKB, orderDis, by="disease")
+pUKBend$inversion <- factor(pUKBend$inversion, levels=orderInvs)
+
+ll <- orderDis$label[order(orderDis$order, 
+                           decreasing = TRUE)]
+pUKBend$label <- factor(pUKBend$label, levels=ll) 
+
+inversions.df <- data.frame(inversionGR)
+names(inversions.df)[6:7] = c("inversion", "band")
+rownames(inversions.df) <- inversions.df$inversion
+
+
+ll2 <- inversions.df[orderInvs, "band"]
+inversions.df$band <- factor(inversions.df$band, levels=ll2)
+pUKBend <- left_join(pUKBend, inversions.df)
+```
+
+```{r plotUKB, fig.height=8}
+o <- pUKBend$p.value < 0.05/length(invs) &
+  !is.na(pUKBend$p.value)
+
+pUKBend$p.value[!o] <- NA
+pUKBend$sign[!o] <- NA
+
+pltUKB <- ggplot(pUKBend, aes(x = band, y = label, 
+                        size=-log10(p.value))) + 
+    geom_point(aes(col = sign)) +
+    scale_color_manual(values=c("red", "blue"),
+                       na.translate=FALSE) +
+    xlab("") + ylab("") +
+    labs(color="Effect I allele") +
+    theme(axis.text.x = element_text(angle = 90, vjust=0.5,
+                                     hjust=1)) +
+    ggtitle("Association analysis UK Biobank")
+pltUKB
+```
+
+These are the effects:
+
+```{r odds_ukb}
+invs.sel <- c("inv8_001", "inv16_009")
+a1 <- SNPassoc::odds(ans.ukb$obesity, model="log-add")[invs.sel[2],]
+a2 <- SNPassoc::odds(ans.ukb$diabetes, model="log-add")[invs.sel[2],]
+a3 <- SNPassoc::odds(ans.ukb$hypertension, model="log-add")[invs.sel[2],]
+a4 <- SNPassoc::odds(ans.ukb$asthma, model="log-add")[invs.sel[2],]
+a5 <- SNPassoc::odds(ans.ukb$everDep, model="log-add")[invs.sel[2],]
+a6 <- SNPassoc::odds(ans.ukb$diab.ob, model="log-add")[invs.sel[2],]
+a7 <- SNPassoc::odds(ans.ukb$hyp.ob, model="log-add")[invs.sel[2],]
+a8 <- SNPassoc::odds(ans.ukb$asthma.ob, model="log-add")[invs.sel[2],]
+a9 <- SNPassoc::odds(ans.ukb$ob.dep, model="log-add")[invs.sel[2],]
+
+x <- paste0("a", 1:9)
+for (i in x)
+ print(unlist(c(1/get(i)[-4], get(i)[4])))
+```
+
+
+
+## Validation: GERA
+
+```{r gera}
+# NOTE: remove manually first row original file from BSC
+load("diabetes/70kT2D.Rdata")
+gera.pheno <- read.table("GERA/GERA_BMI.sample", header=TRUE)
+gera <- merge(gera, gera.pheno, by.x="SID", by.y="ID_1")
+gera.cov <- read.table("GERA/phs000674.v1.pht003641.v1.p1.c1.Survey.HROO.txt", header=TRUE)
+gera2 <- merge(gera, gera.cov, by.x="SID", by.y="SUBJID")
+
+gera$inv16_009 <- dplyr::recode(gera$inv16_009, "NN"="II", "II"="NN")
+
+gera$diab.ob <- rep(NA, nrow(gera))
+gera$diab.ob[gera$DIA2==0 & gera$ob==0] <- 0
+gera$diab.ob[gera$DIA2==1 & gera$ob==1] <- 1
+
+gera$hyper.ob <- rep(NA, nrow(gera))
+gera$hyper.ob[gera$HYPER==0 & gera$ob==0] <- 0
+gera$hyper.ob[gera$HYPER==1 & gera$ob==1] <- 1
+
+gera$dep.ob <- rep(NA, nrow(gera))
+gera$dep.ob[gera$DEPRESS==0 & gera$ob==0] <- 0
+gera$dep.ob[gera$DEPRESS==1 & gera$ob==1] <- 1
+
+gera$asthma.ob <- rep(NA, nrow(gera))
+gera$asthma.ob[gera$ASTHMA==0 & gera$ob==0] <- 0
+gera$asthma.ob[gera$ASTHMA==1 & gera$ob==1] <- 1
+
+ss <- grep("inv", names(gera))
+gera.s <- setupSNP(gera, colSNPs = ss, sep="")
+
+obesity.gera <- WGassociation(ob ~ sex + + BIRTHYEARCAT + PC1 +
+                              PC2 + PC3 + PC4, data=gera.s, geno=0)
+
+
+hyper.gera <- WGassociation(HYPER ~ sex + + BIRTHYEARCAT + PC1 +
+                              PC2 + PC3 + PC4, data=gera.s, geno=0)
+depress.gera <- WGassociation(DEPRESS ~ sex + BIRTHYEARCAT + PC1 +
+                                PC2 + PC3 + PC4, data=gera.s)
+asthma.gera <- WGassociation(ASTHMA ~ sex + BIRTHYEARCAT + PC1 +
+                                PC2 + PC3 + PC4, data=gera.s)
+
+hyper.ob.gera <- WGassociation(hyper.ob ~ sex + BIRTHYEARCAT + PC1 +
+                               PC2 + PC3 +  PC4, data=gera.s, geno=0)
+dep.ob.gera <- WGassociation(dep.ob ~ sex + BIRTHYEARCAT + PC1 +
+                               PC2 + PC3 +  PC4, data=gera.s,
+                             geno=0)
+ashtma.ob.gera <- WGassociation(asthma.ob ~ sex + BIRTHYEARCAT + PC1 +
+                               PC2 + PC3 +  PC4, data=gera.s,
+                             geno=0)
+diab.ob.gera <- WGassociation(diab.ob ~ sex + BIRTHYEARCAT + PC1 +
+                               PC2 + PC3 +  PC4, data=gera.s,
+                             geno=0)
+```
+
+These are the effects:
+
+```{r odds_gera}
+invs.sel <- c("inv8_001", "inv16_009")
+SNPassoc::odds(hyper.gera, model="log-add")[invs.sel[2],]
+SNPassoc::odds(asthma.gera, model="log-add")[invs.sel[2],]
+SNPassoc::odds(depress.gera, model="log-add")[invs.sel[2],]
+
+SNPassoc::odds(hyper.ob.gera, model="log-add")[invs.sel[2],]
+SNPassoc::odds(ashtma.ob.gera, model="log-add")[invs.sel[2],]
+SNPassoc::odds(dep.ob.gera, model="log-add")[invs.sel[2],]
+
+```
+
+
+
+```{r pGERA}
+pvalGERA <- NULL
+temp <- getP(obesity.gera)
+pvalGERA <- c(pvalGERA, temp)
+
+temp <- getP(hyper.gera)
+pvalGERA <- c(pvalGERA, temp)
+
+temp <- getP(diabetes.res)
+pvalGERA <- c(pvalGERA, temp)
+
+
+temp <- getP(asthma.gera)
+pvalGERA <- c(pvalGERA, temp)
+
+
+temp <- getP(depress.gera)
+pvalGERA <- c(pvalGERA, temp)
+```
+
+```{r plot_inflated, fig.height=6, fig.width=6}
+par(mfrow=c(1,2), mar=c(4,4.2,2,1.5))
+p1 <- pUKB$p.value
+qqplotBand(p1[!is.na(p1)], pch=16, main="UKB")
+p2 <- pvalGERA
+qqplotBand(p2[!is.na(p2)], pch=16, main="GERA + 70KT2D")
+
+```
+
+# Transcriptomic effects in GTeX
+
+```{r plotGTeX}
+invsAnnot <- data.frame(Inversion =
+                          mcols(inversionGR)$scoreInvHap.name,
+                        posInv = start(inversionGR))
+load("GTEX/GTEX_results_sig_tissue_level.Rdata")
+invsDF <- invsDF.sig
+invsDF$chromosome <- gsub("chr", "", invsDF$chromosome)
+temp <- gsub("inv", "", invsDF$Inversion)
+temp <- sapply(strsplit(temp, "_"), function(x) x[1])
+invsDF$to.gr <- temp
+invsDF$rearrangement <- invsDF$to.gr==invsDF$chr
+invsDF2 <- merge(invsDF, invsAnnot)
+```
+
+```{r export_Excel}
+invsDF.sig$symbol[is.na(invsDF.sig$symbol)] <- "Not Mapped"
+dat <- split(invsDF.sig, invsDF.sig$Inversion)
+mm <- inversionGR[!duplicated(inversionGR$scoreInvHap.name)][names(dat), ]
+cytoband <- mm$Cytogenetic.location
+cytoband[is.na(cytoband)] <- "10p1"
+names(dat) <-  cytoband
+writexl::write_xlsx(dat, "Supp_File_2.xlsx")
+```
+
+
+```{r summ_gtex}
+invsDF1 <- subset(invsDF, Inversion%in%c("inv8_001",
+                                   "inv17_007",
+                                   "inv16_009"))
+tt1 <- with(invsDF1,
+            table(Tissue))
+summary(c(tt1))
+
+
+invsDF2 <- subset(invsDF, !Inversion%in%c("inv8_001",
+                                   "inv17_007",
+                                   "inv16_009"))
+tt2 <- with(invsDF2 ,
+            table(Tissue))
+summary(c(tt2))
+
+nTissue <- length(unique(invsDF$Tissue))
+nInversions <- length(unique(invsDF$Inversion))
+aa <- table(invsDF$Inversion, invsDF$Tissue)
+a <- apply(aa, 1, function(x) sum(x!=0))
+a/nTissue
+mean(a>15)
+
+a <- apply(aa, 2, function(x) sum(x!=0))
+temp <- a/nInversions
+temp[order(temp, decreasing = TRUE)]
+
+```
+
+
+
+```{r gtex_inversions}
+invs.gtex <- unique(invsDF2$Inversion)
+plt.gtex <- list()
+genes.gtex <- list()
+tissues.gtex <- list()
+for (i in invs.gtex){
+ xx <- invsDF2[invsDF2$Inversion==i,]
+ plt.gtex[[i]] <- plotGTeX(xx, tit=i)
+ genes.gtex[[i]] <- xx$symbol
+ tissues.gtex[[i]] <- xx$Tissue
+}
+```
+
+```{r plot_all_GTeX, fig.width=10, fig.height=42}
+# ggpubr::ggarrange(plotlist=plt.gtex, ncol=2, nrow=7)
+for (i in 1:length(invs.gtex))
+  plt.gtex[[i]]
+```
+
+```{r get_tissues_genes}
+ff <- function(x) {
+  ans <- unlist(x)
+  ans <- ans[!is.na(ans)]
+  return(unique(ans))
+}
+
+ff2 <- function(x) {
+  ans <- unlist(x)
+  ans <- ans[!is.na(ans)]
+  ans <- unlist(lapply(strsplit(ans, " - "), "[", 1))
+  return(unique(ans))
+}
+
+temp <- lapply(genes.gtex, ff)
+lapply(temp, function(x) paste(x, collapse=", "))
+temp <- lapply(tissues.gtex, ff2)
+lapply(temp, function(x) paste(x, collapse=", "))
+```
+
+## Adipose - Subcutaneous
+
+```{r plotAdiposeSub, fig.height=12, fig.width=12}
+plotCircosInv(invsDF2, "Adipose - Subcutaneous")
+```
+
+## Adipose - Visceral (Omentum)
+
+```{r plotAdiposeVisc, fig.height=12, fig.width=12}
+plotCircosInv(invsDF2, "Adipose - Visceral")
+```
+
+## Brain 
+
+```{r plotBrain, fig.height=12, fig.width=12}
+sel <- grep("Brain", invsDF2$Tissue)
+brains <- unique(invsDF2$Tissue[sel])
+
+plt.brain <- list()
+for (i in brains){
+ plt.brain[[i]] <- plotCircosInv(invsDF2, i)
+}
+```
+
+## Pancreas 
+
+```{r plotPancreas, fig.height=12, fig.width=12}
+plotCircosInv(invsDF2, "Pancreas")
+```
+
+## Blood
+
+```{r plotBlood, fig.height=12, fig.width=12}
+plotCircosInv(invsDF2, "Blood")
+```
+
+## Lung
+
+```{r plotLung, fig.height=12, fig.width=12}
+plotCircosInv(invsDF2, "Lung")
+```
+
+```{r show_sig_some}
+unique(unlist(subset(invsDF, Tissue=="Pancreas" & (Inversion=="inv16_009" | Inversion=="inv8_001"))$symbol))
+
+bb <- unique(grep("Brain", invsDF$Tissue, value = TRUE))
+unique(unlist(subset(invsDF, Tissue%in%bb & (Inversion=="inv16_009" | Inversion=="inv8_001"))$symbol))
+
+aa <- unique(grep("Adipo", invsDF$Tissue, value = TRUE))
+unique(unlist(subset(invsDF, Tissue%in%aa & (Inversion=="inv16_009" | Inversion=="inv8_001"))$symbol))
+
+```
