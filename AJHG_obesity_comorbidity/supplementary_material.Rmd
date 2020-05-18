@@ -232,8 +232,6 @@ cbind(round(mat[,1:3],1), pval=round(mat[,4],4))
 ii <- grep("^inv", names(popres.eur))
 x.s <- setupSNP(popres.eur, ii, sep="")
 summary(x.s)
-alleles <- getAlleleRefs(x.s)
-alleles$ref
 ```
 
 
@@ -269,111 +267,18 @@ p1
 
 ## Discovery analysis: UK Biobank
 
-Load data:
+The object having the results (p-values and sign effect) corresponding to the association analyse is loaded by:
 
-```{r load_ukb}
-load("UKBiobank/caco_ukb.Rdata")
-ii <- grep("inv", names(bd.s))
-bd.s <- setupSNP(bd.s, ii)
+```{r load_pUKB}
+load("UKBiobank/pUKB.Rdata")
 ```
 
-```{r setupSNP}
-sum.ukb <- summary(bd.s)
-```
+NOTE: genotypes and fenotypes to get the p-values are avialable in the [UK Biobank repository](https://biobank.ndph.ox.ac.uk/showcase/docs.cgi?id=1)
 
-```{r descr_ukb, eval=FALSE}
-vars <- c("obesity", "bmi", "bmicat", "waist", "hip", "whr", "diabetes", "gluc", "hdl", "ldl", "trig", "chol", "stroke", "hypertension",
-          "sbp", "dbp", "asthma", "copd", "fev1", "fvc", "fev1_fvc", "everDep", "bip", "neurot", "risk", "moodSwin",  "diab.ob", "hyp.ob",
-          "asthma.ob", "ob.dep", "ob.neuro")
-bb <- bd.s[,vars]
-idx <- which(sapply(bb, is.logical))
-bb <- bb%>%mutate_at(idx, as.integer)
-idx <- which(sapply(bb,function(x) length(table(x))==2))
-bb <- bb%>%mutate_at(idx, factor, labels=c("no", "yes"))
-
-descr <- compareGroups( ~. , bb)
-tab.descr <- createTable(descr)
-export2md(tab.descr)
-```
-
-Let us export the data to a Word table
-
-```{r export_tren_table}
-export2word(tab.descr, file="tab_sup1.docx")
-```
-
-
-The association analysis is performed by (add R code):
-
-....
-
-
-The object having the results is loaded by:
-
-```{r get_results, echo=FALSE}
-load(file="UKBiobank/resUKB.Rdata")
-ans.ukb <- ans.ukb[-which(names(ans.ukb)=="triad")]
-diseases.ukb <- names(ans.ukb)
-invs <- rownames(ans.ukb$obesity)
-```
-
-
-```{r getPvaluesUKB}
-getP <- function(x){
-  apply(pvalues(x), 1, min, na.rm=TRUE)
-}
-
-temp <- lapply(ans.ukb, getP)
-pUKB <- data.frame(p.value=unlist(temp))
-
-
-pUKB$disease <- rep(diseases.ukb, each=length(invs))
-pUKB$inversion <- rep(invs,
-                      length(diseases.ukb))
-
-refs <- unlist(getAlleleRef(sum.ukb$alleles))
-refs.ukb <- data.frame(inversion=rownames(sum.ukb),
-                       ref = refs, 
-                       stringsAsFactors = FALSE) 
-
-pUKB <- left_join(pUKB, refs.ukb)
-
-oo <- data.frame(lapply(ans.ukb, getBetasSign))
-betas <- rownames_to_column(oo, 'inversion') %>% 
-  gather(disease, beta, -inversion)
-betas$beta <- factor(betas$beta, labels = c("Negative", "Positive"))
-pUKB <- left_join(pUKB, betas)
-pUKB$sign <- pUKB$beta
-pUKB$sign[pUKB$ref=="I" & pUKB$beta=="Positive"] <- "Negative"
-pUKB$sign[pUKB$ref=="I" & pUKB$beta=="Negative"] <- "Positive"
-
-orderInvs <- c("inv8_001", "inv16_009", "inv17_007",
-               "inv2_002", "inv3_003", "inv7_003", "inv11_001",
-               "inv12_006", "inv1_004", "inv1_008", "inv2_013", "inv6_002",
-               "inv6_006", "inv7_005", "inv7_011", "inv7_014", "inv11_004", 
-               "inv12_004", "inv14_005", "inv21_005", "invX_006")
-
-orderDis <- read.delim("UKBiobank/diseases.txt", as.is=TRUE)
-
-
-pUKBend <- inner_join(pUKB, orderDis, by="disease")
-pUKBend$inversion <- factor(pUKBend$inversion, levels=orderInvs)
-
-ll <- orderDis$label[order(orderDis$order, 
-                           decreasing = TRUE)]
-pUKBend$label <- factor(pUKBend$label, levels=ll) 
-
-inversions.df <- data.frame(inversionGR)
-names(inversions.df)[6:7] = c("inversion", "band")
-rownames(inversions.df) <- inversions.df$inversion
-
-
-ll2 <- inversions.df[orderInvs, "band"]
-inversions.df$band <- factor(inversions.df$band, levels=ll2)
-pUKBend <- left_join(pUKBend, inversions.df)
-```
+Then the Figure 2 in the manuscript is created by
 
 ```{r plotUKB, fig.height=8}
+
 o <- pUKBend$p.value < 0.05/length(invs) &
   !is.na(pUKBend$p.value)
 
@@ -393,9 +298,10 @@ pltUKB <- ggplot(pUKBend, aes(x = band, y = label,
 pltUKB
 ```
 
-These are the effects:
+The Odds Ratios are here:
 
 ```{r odds_ukb}
+load("UKBiobank/resUKB_final.Rdata")
 invs.sel <- c("inv8_001", "inv16_009")
 a1 <- SNPassoc::odds(ans.ukb$obesity, model="log-add")[invs.sel[2],]
 a2 <- SNPassoc::odds(ans.ukb$diabetes, model="log-add")[invs.sel[2],]
