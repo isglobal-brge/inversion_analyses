@@ -174,6 +174,16 @@ fviz_pca_biplot(pca.EURcountry, repel = TRUE,
                 )
 ```
 
+The major allele frequencies in Europe are
+
+```{r major_freqEU}
+ii <- grep("^inv", names(popres.eur))
+x.s <- setupSNP(popres.eur, ii, sep="")
+summary(x.s)
+```
+
+That can be visually inspected in this Figure:
+
 ```{r plotGeographical1}
 x <- tidyr::gather(freq.EURreg, 
                    key="inversion", 
@@ -193,6 +203,31 @@ p2 <- ggplot(x2, aes(x=pop, y=freq, fill=pop)) +
 
 p2
 ```
+
+
+
+
+
+We can compare the minor allele frequency of each European region to see whether there is a North-South trend
+
+
+```{r test_trend}
+invs.pops <- grep("^inv", colnames(freq.EURreg2), value = TRUE)
+ll <- c("North", "Center", "South")
+mat <- matrix(NA, nrow=length(invs.pops), ncol=4)
+j <- 1
+for (i in invs.pops) {
+  freqs.i <- freq.EURreg2[ll,i]
+  p.i <- prop.trend.test(round((freqs.i/100)*n.europe,0), n.europe, score=c(1,2,3))$p.value
+  mat[j,] <- c(freqs.i, p.i)
+  j <- j + 1
+}
+rownames(mat) <- invs.pops
+colnames(mat) <- c("North", "Center", "South", "pvalue")
+cbind(round(mat[,1:3],1), pval=round(mat[,4],4))
+```
+
+This can be visually inspected in this figure:
 
 ```{r plotGeographical2}
 x <- tidyr::gather(freq.EURreg2, 
@@ -214,51 +249,7 @@ p3 <- ggplot(x, aes(x=pop2, y=freq, fill=pop2)) +
 p3
 ```
 
-```{r test_trend}
-invs.pops <- grep("^inv", colnames(freq.EURreg2), value = TRUE)
-ll <- c("North", "Center", "South")
-mat <- matrix(NA, nrow=length(invs.pops), ncol=4)
-j <- 1
-for (i in invs.pops) {
-  freqs.i <- freq.EURreg2[ll,i]
-  p.i <- prop.trend.test(round((freqs.i/100)*n.europe,0), n.europe, score=c(1,2,3))$p.value
-  mat[j,] <- c(freqs.i, p.i)
-  j <- j + 1
-}
-rownames(mat) <- invs.pops
-colnames(mat) <- c("North", "Center", "South", "pvalue")
-cbind(round(mat[,1:3],1), pval=round(mat[,4],4))
 
-ii <- grep("^inv", names(popres.eur))
-x.s <- setupSNP(popres.eur, ii, sep="")
-summary(x.s)
-```
-
-
-
-### European countries
-
-```{r plotEuropeanFreqs}
-x <- tidyr::gather(freq.EURcountry, 
-                   key="inversion", 
-                   value="freq", -pop)
-colourCount <- length(unique(x$pop)) 
-
-p1 <- ggplot(x[!x$pop%in%c("EuropeanA", "EuropeanB"),], 
-             aes(x=pop, y=freq, fill=pop)) +
-      geom_bar(stat="identity") + facet_wrap(~ inversion) +
-      labs(fill = "Country", x="", 
-           y="Frequency of I allele") +
-      ggtitle("POPRES - European Countries") +
-  scale_fill_manual(values = colorRampPalette
-                    (brewer.pal(11, "PRGn"))(colourCount))+
-  theme(axis.text.x=element_blank(), 
-        axis.title.y = element_text(size=16),
-        axis.text.y = element_text(size=12),
-        title = element_text(face="bold", size=14))  
-
-p1
-```
 
 
 
