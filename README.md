@@ -1,8 +1,8 @@
 # Overview
 
-This repository provides access to several reproducible documents related to our work on genetic polymorphic inversions. It includes [Bioinformatic tools]() to detect inversions from SNP array data as well as our discoveries of new association between [genetic inversions and human traits](#IAA). 
+This repository provides access to several reproducible documents related to our work on genetic polymorphic inversions. It includes [Bioinformatic tools][] to detect inversions from SNP array data as well as our discoveries of [association between genetic inversions and human traits](#IAA). 
 
-# Bioinformatic tools
+# Bioinformatic tools 
    - [inveRsion](https://www.bioconductor.org/packages/release/bioc/html/inveRsion.html). Bioconductor package to detect new inversions using SNP array data. Paper:  Identification of polymorphic inversions from genotypes. [Vignette](https://github.com/isglobal-brge/invClust/blob/master/vignettes/invClust.pdf). (https://bmcbioinformatics.biomedcentral.com/articles/10.1186/1471-2105-13-28). Cáceres A, et al. BMC Bioinformatics, 2012. [Vignette](https://www.bioconductor.org/packages/release/bioc/vignettes/inveRsion/inst/doc/inveRsion.pdf).
    
    - [invClust](https://github.com/isglobal-brge/invClust). R package to call inversions considering ancestry and multidimensional scalling method. Paper: [Following the footprints of polymorphic inversions on SNP data: from detection to association tests](https://academic.oup.com/nar/article/43/8/e53/2414175). Cáceres A and González JR. Nucleic Acids Research, 2015. [Vignette]().
