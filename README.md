@@ -15,5 +15,5 @@ This repository provides access to several reproducible documents related to our
    
    - Inversion association with **cancer**. Paper: [Common polymorphic inversions at 17q21.31 and 8p23.1 associate with cancer prognosis](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6873427/). Ruiz-Arenas C, et al. Human Genomics, 2019. 
    
-   - Inversion association with **obesity related traits**. Paper: [Polymorphic inversions underlie the shared genetic susceptibility of obesity-related diseases](https://www.biorxiv.org/content/10.1101/859280v1). González JR, et al. Am J Hum Genet, 2020.  [R markdown]().
+   - Inversion association with **obesity related traits**. Paper: [Polymorphic inversions underlie the shared genetic susceptibility of obesity-related diseases](https://www.biorxiv.org/content/10.1101/859280v1). González JR, et al. Am J Hum Genet, 2020.  [R markdown](https://htmlpreview.github.io/?https://github.com/isglobal-brge/inversion_analyses/blob/master/AJHG_obesity_comorbidity/supplementary_material.html).
     
