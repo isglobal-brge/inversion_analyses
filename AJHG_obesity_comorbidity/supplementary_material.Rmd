@@ -215,7 +215,7 @@ p3
 ```
 
 ```{r test_trend}
-invs.pop <- grep("^inv", colnames(freq.EURreg2), value = TRUE)
+invs.pops <- grep("^inv", colnames(freq.EURreg2), value = TRUE)
 ll <- c("North", "Center", "South")
 mat <- matrix(NA, nrow=length(invs.pops), ncol=4)
 j <- 1
