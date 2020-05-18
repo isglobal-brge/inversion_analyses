@@ -303,19 +303,27 @@ The Odds Ratios are here:
 ```{r odds_ukb}
 load("UKBiobank/resUKB_final.Rdata")
 invs.sel <- c("inv8_001", "inv16_009")
-a1 <- SNPassoc::odds(ans.ukb$obesity, model="log-add")[invs.sel[2],]
-a2 <- SNPassoc::odds(ans.ukb$diabetes, model="log-add")[invs.sel[2],]
-a3 <- SNPassoc::odds(ans.ukb$hypertension, model="log-add")[invs.sel[2],]
-a4 <- SNPassoc::odds(ans.ukb$asthma, model="log-add")[invs.sel[2],]
-a5 <- SNPassoc::odds(ans.ukb$everDep, model="log-add")[invs.sel[2],]
-a6 <- SNPassoc::odds(ans.ukb$diab.ob, model="log-add")[invs.sel[2],]
-a7 <- SNPassoc::odds(ans.ukb$hyp.ob, model="log-add")[invs.sel[2],]
-a8 <- SNPassoc::odds(ans.ukb$asthma.ob, model="log-add")[invs.sel[2],]
-a9 <- SNPassoc::odds(ans.ukb$ob.dep, model="log-add")[invs.sel[2],]
+phenos <- c("obesity", "diabetes", "hypertension", "asthma", "depression",
+                     "diabetes/obesity", "hypertension/obesity", "asthma/obesity",
+                     "depression/obesity")
 
-x <- paste0("a", 1:9)
-for (i in x)
- print(unlist(c(1/get(i)[-4], get(i)[4])))
+invOR <- list()
+for (i in 1:2){
+  a1 <- SNPassoc::odds(ans.ukb$obesity, model="log-add")[invs.sel[i],]
+  a2 <- SNPassoc::odds(ans.ukb$diabetes, model="log-add")[invs.sel[i],]
+  a3 <- SNPassoc::odds(ans.ukb$hypertension, model="log-add")[invs.sel[i],]
+  a4 <- SNPassoc::odds(ans.ukb$asthma, model="log-add")[invs.sel[i],]
+  a5 <- SNPassoc::odds(ans.ukb$everDep, model="log-add")[invs.sel[i],]
+  a6 <- SNPassoc::odds(ans.ukb$diab.ob, model="log-add")[invs.sel[i],]
+  a7 <- SNPassoc::odds(ans.ukb$hyp.ob, model="log-add")[invs.sel[i],]
+  a8 <- SNPassoc::odds(ans.ukb$asthma.ob, model="log-add")[invs.sel[i],]
+  a9 <- SNPassoc::odds(ans.ukb$ob.dep, model="log-add")[invs.sel[i],]
+  invOR[[i]] <- rbind(a1, a2, a3, a4, a5, a6, a7, a8, a9)
+  names(invOR[[i]])[4] <- "p.value"
+  rownames(invOR[[i]]) <- phenos
+}
+names(invOR) <- invs.sel
+invOR
 ```
 
 
@@ -379,13 +387,13 @@ These are the effects:
 
 ```{r odds_gera}
 invs.sel <- c("inv8_001", "inv16_009")
-SNPassoc::odds(hyper.gera, model="log-add")[invs.sel[2],]
-SNPassoc::odds(asthma.gera, model="log-add")[invs.sel[2],]
-SNPassoc::odds(depress.gera, model="log-add")[invs.sel[2],]
+SNPassoc::odds(hyper.gera, model="log-add")[invs.sel[i],]
+SNPassoc::odds(asthma.gera, model="log-add")[invs.sel[i],]
+SNPassoc::odds(depress.gera, model="log-add")[invs.sel[i],]
 
-SNPassoc::odds(hyper.ob.gera, model="log-add")[invs.sel[2],]
-SNPassoc::odds(ashtma.ob.gera, model="log-add")[invs.sel[2],]
-SNPassoc::odds(dep.ob.gera, model="log-add")[invs.sel[2],]
+SNPassoc::odds(hyper.ob.gera, model="log-add")[invs.sel[i],]
+SNPassoc::odds(ashtma.ob.gera, model="log-add")[invs.sel[i],]
+SNPassoc::odds(dep.ob.gera, model="log-add")[invs.sel[i],]
 
 ```
 
@@ -417,155 +425,6 @@ p1 <- pUKB$p.value
 qqplotBand(p1[!is.na(p1)], pch=16, main="UKB")
 p2 <- pvalGERA
 qqplotBand(p2[!is.na(p2)], pch=16, main="GERA + 70KT2D")
-
 ```
 
 # Transcriptomic effects in GTeX
-
-```{r plotGTeX}
-invsAnnot <- data.frame(Inversion =
-                          mcols(inversionGR)$scoreInvHap.name,
-                        posInv = start(inversionGR))
-load("GTEX/GTEX_results_sig_tissue_level.Rdata")
-invsDF <- invsDF.sig
-invsDF$chromosome <- gsub("chr", "", invsDF$chromosome)
-temp <- gsub("inv", "", invsDF$Inversion)
-temp <- sapply(strsplit(temp, "_"), function(x) x[1])
-invsDF$to.gr <- temp
-invsDF$rearrangement <- invsDF$to.gr==invsDF$chr
-invsDF2 <- merge(invsDF, invsAnnot)
-```
-
-```{r export_Excel}
-invsDF.sig$symbol[is.na(invsDF.sig$symbol)] <- "Not Mapped"
-dat <- split(invsDF.sig, invsDF.sig$Inversion)
-mm <- inversionGR[!duplicated(inversionGR$scoreInvHap.name)][names(dat), ]
-cytoband <- mm$Cytogenetic.location
-cytoband[is.na(cytoband)] <- "10p1"
-names(dat) <-  cytoband
-writexl::write_xlsx(dat, "Supp_File_2.xlsx")
-```
-
-
-```{r summ_gtex}
-invsDF1 <- subset(invsDF, Inversion%in%c("inv8_001",
-                                   "inv17_007",
-                                   "inv16_009"))
-tt1 <- with(invsDF1,
-            table(Tissue))
-summary(c(tt1))
-
-
-invsDF2 <- subset(invsDF, !Inversion%in%c("inv8_001",
-                                   "inv17_007",
-                                   "inv16_009"))
-tt2 <- with(invsDF2 ,
-            table(Tissue))
-summary(c(tt2))
-
-nTissue <- length(unique(invsDF$Tissue))
-nInversions <- length(unique(invsDF$Inversion))
-aa <- table(invsDF$Inversion, invsDF$Tissue)
-a <- apply(aa, 1, function(x) sum(x!=0))
-a/nTissue
-mean(a>15)
-
-a <- apply(aa, 2, function(x) sum(x!=0))
-temp <- a/nInversions
-temp[order(temp, decreasing = TRUE)]
-
-```
-
-
-
-```{r gtex_inversions}
-invs.gtex <- unique(invsDF2$Inversion)
-plt.gtex <- list()
-genes.gtex <- list()
-tissues.gtex <- list()
-for (i in invs.gtex){
- xx <- invsDF2[invsDF2$Inversion==i,]
- plt.gtex[[i]] <- plotGTeX(xx, tit=i)
- genes.gtex[[i]] <- xx$symbol
- tissues.gtex[[i]] <- xx$Tissue
-}
-```
-
-```{r plot_all_GTeX, fig.width=10, fig.height=42}
-# ggpubr::ggarrange(plotlist=plt.gtex, ncol=2, nrow=7)
-for (i in 1:length(invs.gtex))
-  plt.gtex[[i]]
-```
-
-```{r get_tissues_genes}
-ff <- function(x) {
-  ans <- unlist(x)
-  ans <- ans[!is.na(ans)]
-  return(unique(ans))
-}
-
-ff2 <- function(x) {
-  ans <- unlist(x)
-  ans <- ans[!is.na(ans)]
-  ans <- unlist(lapply(strsplit(ans, " - "), "[", 1))
-  return(unique(ans))
-}
-
-temp <- lapply(genes.gtex, ff)
-lapply(temp, function(x) paste(x, collapse=", "))
-temp <- lapply(tissues.gtex, ff2)
-lapply(temp, function(x) paste(x, collapse=", "))
-```
-
-## Adipose - Subcutaneous
-
-```{r plotAdiposeSub, fig.height=12, fig.width=12}
-plotCircosInv(invsDF2, "Adipose - Subcutaneous")
-```
-
-## Adipose - Visceral (Omentum)
-
-```{r plotAdiposeVisc, fig.height=12, fig.width=12}
-plotCircosInv(invsDF2, "Adipose - Visceral")
-```
-
-## Brain 
-
-```{r plotBrain, fig.height=12, fig.width=12}
-sel <- grep("Brain", invsDF2$Tissue)
-brains <- unique(invsDF2$Tissue[sel])
-
-plt.brain <- list()
-for (i in brains){
- plt.brain[[i]] <- plotCircosInv(invsDF2, i)
-}
-```
-
-## Pancreas 
-
-```{r plotPancreas, fig.height=12, fig.width=12}
-plotCircosInv(invsDF2, "Pancreas")
-```
-
-## Blood
-
-```{r plotBlood, fig.height=12, fig.width=12}
-plotCircosInv(invsDF2, "Blood")
-```
-
-## Lung
-
-```{r plotLung, fig.height=12, fig.width=12}
-plotCircosInv(invsDF2, "Lung")
-```
-
-```{r show_sig_some}
-unique(unlist(subset(invsDF, Tissue=="Pancreas" & (Inversion=="inv16_009" | Inversion=="inv8_001"))$symbol))
-
-bb <- unique(grep("Brain", invsDF$Tissue, value = TRUE))
-unique(unlist(subset(invsDF, Tissue%in%bb & (Inversion=="inv16_009" | Inversion=="inv8_001"))$symbol))
-
-aa <- unique(grep("Adipo", invsDF$Tissue, value = TRUE))
-unique(unlist(subset(invsDF, Tissue%in%aa & (Inversion=="inv16_009" | Inversion=="inv8_001"))$symbol))
-
-```
